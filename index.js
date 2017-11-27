@@ -134,6 +134,15 @@ var mongoWrapper = {
     },
 
     /**
+     * Updates data without resetting other fields.
+     */
+    updateData : function(collection, data, callback){
+        if(data instanceof Array) return callback(new Error("Arrays are not supported yet for updating"))
+        if(!data._id) return callback(new Error("Missing ID.."))
+        var collection = _db.collection(collection)
+        collection.findOneAndUpdate({_id: data._id}, {$set:data}, { returnOriginal:false, upsert:true }, callback)
+    },
+    /**
      * Handy shortcut to insert new row(s) into mongo db
      * @param collection {String} name of the collection to instert to.
      * @param data {JSON} single Json object.

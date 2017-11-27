@@ -1,6 +1,6 @@
 {
   "name": "dalisra-mongo-wrapper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Simple mongodb wrapper",
   "main": "index.js",
   "scripts": {
@@ -19,5 +19,9 @@
   "bugs": {
     "url": "https://github.com/Dalisra/mongo-wrapper/issues"
   },
-  "homepage": "https://github.com/Dalisra/mongo-wrapper#readme"
+  "homepage": "https://github.com/Dalisra/mongo-wrapper#readme",
+  "dependencies": {
+    "async": "^2.6.0",
+    "mongodb": "^2.2.33"
+  }
 }
