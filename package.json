@@ -1,0 +1,23 @@
+{
+  "name": "dalisra-mongo-wrapper",
+  "version": "1.0.0",
+  "description": "Simple mongodb wrapper",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dalisra/mongo-wrapper.git"
+  },
+  "keywords": [
+    "wrapper",
+    "mongodb"
+  ],
+  "author": "Dalisra <admin@dalisra.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Dalisra/mongo-wrapper/issues"
+  },
+  "homepage": "https://github.com/Dalisra/mongo-wrapper#readme"
+}
