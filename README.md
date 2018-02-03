@@ -10,9 +10,18 @@ Simple mongodb wrapper
     // include wrapper
     let mongo = require('dalisra-mongo-wrapper')
 
-    // define options or load from environment variables
-    let opts = {} // TODO: explain possible config here.
-
+    // default options, that can be overriden
+    var opts = {
+        connectionString: "mongodb://localhost:27017/test", //HOST and PORT is ignored if using this property.
+        HOST: 'localhost',
+        PORT: 27017,
+        DATABASE: 'test',
+        maxConnectAttempts: 0,
+        connectRetryDelay: 5000,
+        afterConnect: function(client, callback){
+            callback()
+        }
+    }
     // keep trying to connect untill success
     mongo.connectToMongo(opts, (err) => {
         if(err) throw err; // <- It is possible to config 'give up conditions'.

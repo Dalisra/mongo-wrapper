@@ -13,6 +13,7 @@ var _currentDatabase = null
 var _client = null
 var _config = {}
 var _defaultConfig = {
+    //connectionString: "mongodb://localhost:27017/test", //HOST and PORT is ignored when using this one.
     HOST: 'localhost',
     PORT: 27017,
     DATABASE: 'test',
@@ -44,8 +45,9 @@ var mongoWrapper = {
                 log = config.log
                 delete config.log
             }
-            _config = Object.assign(_defaultConfig, config)
+            _config = Object.assign(_defaultConfig, _config, config)
         }
+        else _config = Object.assign(_defaultConfig, _config)
     },
 
     /** Method that tries to connect to mongo, and retries if it fails.
@@ -57,7 +59,10 @@ var mongoWrapper = {
      * @param afterConnect - function that is called after success connection, this function is called with 2 params: client & callback
      */
     connectToMongo: function connectToMongo(config, callback) {
+        if(typeof config === "string") config = { connectionString: config }
+        
         this.setConfig(config)
+
         async.whilst(
             function(){
                 if(mongoWrapper.isConnected()) return false
@@ -147,6 +152,7 @@ var mongoWrapper = {
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString : function(){
+        if(_config.connectionString) return _config.connectionString
         return "mongodb://" + (_config.HOST || _defaultConfig.HOST) + ":" + (_config.PORT || _defaultConfig.PORT) + "/" + (_config.DATABASE || _defaultConfig.DATABASE)
     },
 
