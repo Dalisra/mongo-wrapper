@@ -1,28 +1,63 @@
 var log = {
     error: console.error,
-    debug: console.log
+    debug: console.log,
+    warn: console.log,
+    fatal: console.error
 }
 var mongodb = require('mongodb')
 var MongoClient = mongodb.MongoClient
 var async = require('async')
-var _db
-var _connectionString
+
+var _currentAttemptNr = 0
+var _currentDatabase = null
+var _client = null
+var _config = {}
+var _defaultConfig = {
+    HOST: 'localhost',
+    PORT: 27017,
+    DATABASE: 'test',
+    maxConnectAttempts: 0,
+    connectRetryDelay: 5000,
+    afterConnect: function(client, callback){
+        callback()
+    }
+}
 
 var mongoWrapper = {
 
     setConfig : function(config){
-        if(typeof config === 'string') _connectionString = config;
-        else{
-            _connectionString = "mongodb://" + config.HOST + ":" + config.PORT + "/" + config.DATABASE
+        if(config){
+            if(config.afterConnect && typeof config.afterConnect !== "function") {
+                delete config.afterConnect
+                log.debug("WARN: config.afterConnect should be a function. Ignoring.")
+            }
+            if(config.connectRetryDelay && typeof config.connectRetryDelay !== "number"){
+                delete config.connectRetryDelay
+                log.debug("WARN: config.connectRetryDelay should be a number. Ignoring.")
+            }
+            if(config.maxConnectAttempts && typeof config.maxConnectAttempts !== "number"){
+                delete config.maxConnectAttempts
+                log.debug("WARN: config.maxConnectAttempts should be a number. Ignoring.")
+            }
+            if(config.log){
+                //using this logger internaly for all logs
+                log = config.log
+                delete config.log
+            }
+            _config = Object.assign(_defaultConfig, config)
         }
     },
 
     /** Method that tries to connect to mongo, and retries if it fails.
      * callback will be called only once it has been successfull to connect to database.
+     * Config contains has:
+     * @param HOST - default 'localhost'
+     * @param PORT - default 27017
+     * @param DATABASE - default 'test'
+     * @param afterConnect - function that is called after success connection, this function is called with 2 params: client & callback
      */
-    connectToMongo: function(config, callback) {
+    connectToMongo: function connectToMongo(config, callback) {
         this.setConfig(config)
-
         async.whilst(
             function(){
                 if(mongoWrapper.isConnected()) return false
@@ -32,11 +67,16 @@ var mongoWrapper = {
                 mongoWrapper.connect(function(err){
                     if (err) {
                         log.error("Cannot connect to MongoDB! Check that mongo is running..", err)
+
+                        //check if we reached max attempts and end with error
+                        if(_config.maxConnectAttempts && _config.maxConnectAttempts !== 0 && _config.maxConnectAttempts <= _currentAttemptNr) {
+                            return next(new Error("Maximum connection attempts reached, giving up."))
+                        }
                         //if We encountered error.. we try to reconnect after some time..
                         setTimeout(function () {
-                            log.debug("Trying to reconnect..")
+                            log.debug("Trying to reconnect.. Attempt nr:" + (_currentAttemptNr+1))
                             next()
-                        }, 5000)
+                        }, _config.connectRetryDelay || 5000)
                     } else {
                         log.debug("Success! connected to Mongo!")
                         next()
@@ -44,10 +84,10 @@ var mongoWrapper = {
                 })
             },
             function(err){
-                if(err) return log.error("Connection to mongoDB failed and will not try to connect anymore.. Restart needed!", err)
-                if(!err) log.debug("Successfully finishing mongo connect method.")
+                if(err) log.error("Connection to mongoDB failed and will not try to connect anymore after " + _currentAttemptNr + " retries. Restart needed!", err)
+                else log.debug("Successfully finishing mongo connect method after " + _currentAttemptNr + " tries.")
+                _currentAttemptNr = 0
                 if(callback) callback(err)
-                return
             }
         )
     },
@@ -61,15 +101,15 @@ var mongoWrapper = {
      * If connection breaks for some reason, application also might want to reconnect using this method.
      * @param callback
      */
-    connect: function (callback) {
-        MongoClient.connect(this.getConnectionString(), function (err, db) {
+    connect: function connect(callback) {
+        _currentAttemptNr++
+        MongoClient.connect(this.getConnectionString(), function (err, client) {
             if (err) return callback(err)
-            /*require('./mongo/afterConnect')(db, function (err) {
-                if (err) return callback(err)
-                //TODO: move 2 lines back here when afterconnect is implemented.
-            })*/
-            _db = db
-            return callback()
+
+            _config.afterConnect(client, function(){
+                _client = client
+                return callback()
+            })
         })
     },
 
@@ -77,8 +117,8 @@ var mongoWrapper = {
      * Tells if we are connected to database.
      * @return {boolean}
      */
-    isConnected: function () {
-        if (_db) return true
+    isConnected: function isConnected() {
+        if (_client) return true
         return false
     },
 
@@ -86,11 +126,28 @@ var mongoWrapper = {
      * Database object to use while it is connected to mongoDB.
      * @returns {*}
      */
-    db: function(){ return _db },
+    db: function db(database){ 
+        if(!this.client()) return null
+        _currentDatabase = database || _config.DATABASE
+        return this.client().db(_currentDatabase) 
+    },
+    getConfig: function getConfig(){
+        return _config
+    },
+    getCurrentDatabase: function getCurrentDatabase(){
+        return _currentDatabase
+    },
+    client: function client(){
+        return _client
+    },
+    collection: function collection(collection){
+        if(!this.db()) return null
+        return this.db().collection(collection)
+    },
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString : function(){
-        return _connectionString
+        return "mongodb://" + (_config.HOST || _defaultConfig.HOST) + ":" + (_config.PORT || _defaultConfig.PORT) + "/" + (_config.DATABASE || _defaultConfig.DATABASE)
     },
 
     /**
@@ -114,7 +171,7 @@ var mongoWrapper = {
      assert.ok(upsert._id != null)
      */
     saveData : function (collection, data, callback) {
-        var collection = _db.collection(collection)
+        var collection = this.collection(collection)
         //if data that we want to save is an array and has more than one item we itterate and save them in batch job.
         if (data instanceof Array && data.length > 1) {
             var batch = collection.initializeUnorderedBulkOp({useLegacyOps: true})
@@ -139,7 +196,7 @@ var mongoWrapper = {
     updateData : function(collection, data, callback){
         if(data instanceof Array) return callback(new Error("Arrays are not supported yet for updating"))
         if(!data._id) return callback(new Error("Missing ID.."))
-        var collection = _db.collection(collection)
+        var collection = this.db().collection(collection)
         collection.findOneAndUpdate({_id: data._id}, {$set:data}, { returnOriginal:false, upsert:true }, callback)
     },
     /**
@@ -149,7 +206,7 @@ var mongoWrapper = {
      * @param callback {Promise} - returns err as first param and result as second.
      */
     insertData : function (collection, data, callback) {
-        var collection = _db.collection(collection)
+        var collection = this.db().collection(collection)
         if (data instanceof Array) {
             collection.insertMany(data, callback)
         } else {
