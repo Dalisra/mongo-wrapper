@@ -7,39 +7,41 @@ Simple mongodb wrapper
 
 ## Usage
 
-    // include wrapper
-    let mongo = require('dalisra-mongo-wrapper')
+    const mongo = require("../index")
+    const async = require('async')
 
-    // default options, that can be overriden
-    var opts = {
-        connectionString: "mongodb://localhost:27017/test", //HOST and PORT is ignored if using this property.
-        HOST: 'localhost',
-        PORT: 27017,
-        DATABASE: 'test',
-        maxConnectAttempts: 0,
-        connectRetryDelay: 5000,
-        afterConnect: function(client, callback){
-            callback()
-        }
-    }
-    // keep trying to connect untill success
-    mongo.connectToMongo(opts, (err) => {
+    // keep trying to connect to mongodb on localhost with default parameters untill success
+    mongo.connectToMongo((err) => {
         if(err) throw err; // <- It is possible to config 'give up conditions'.
 
         // You are now connected to database and can start doing queries.
-        
-        // Example: save some data:
-        mongo.saveData('products', {number: 123, name:"Product 123"}, (err, createdProduct)=>{
-            if(err) return console.error("MongoDb returned error: ", err)
-
-            console.log("Product created: " + JSON.stringify(createdProduct))
-
-            // And now lets get some data:
-            mongo.collection('products').find({}).toArray((err, products) => {
-                if(err) return console.error("MongoDb returned error: ", err)
-
-                console.log("Got following products from database: " + JSON.stringify(products))
-            })
+        async.waterfall([
+            (next) => {
+                // lets clear all the data in products collection
+                mongo.clearData('products', (err, result) => {
+                    if(err) console.error("MongoDb returned error: ", err)
+                    console.log("Result: " + JSON.stringify(result))
+                    next()
+                })
+            },
+            (next) => {
+                // lets add a product
+                mongo.saveData('products', {number: 123, name:"Product 123"}, (err, result) => {
+                    if(err) console.error("MongoDb returned error: ", err)
+                    console.log("Products created: " + JSON.stringify(result.ops))
+                    next()
+                })
+            },
+            (next) => {
+                // lets find all products in products collection
+                mongo.collection('products').find({}).toArray((err, products) => {
+                    if(err) console.error("MongoDb returned error: ", err)
+                    console.log("Got following products from database: " + JSON.stringify(products))
+                    next()
+                })
+            }
+        ], (err) => {
+            mongo.client().close();
         })
     })
 

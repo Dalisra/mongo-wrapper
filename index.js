@@ -59,6 +59,10 @@ var mongoWrapper = {
      * @param afterConnect - function that is called after success connection, this function is called with 2 params: client & callback
      */
     connectToMongo: function connectToMongo(config, callback) {
+        if(typeof config === "function" && !callback) {
+            callback = config
+            config = {}
+        }
         if(typeof config === "string") config = { connectionString: config }
         
         this.setConfig(config)
@@ -149,6 +153,9 @@ var mongoWrapper = {
         if(!this.db()) return null
         return this.db().collection(collection)
     },
+    close: function close(){
+        if(this.client()) this.client().close();
+    },
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString : function(){
@@ -218,6 +225,9 @@ var mongoWrapper = {
         } else {
             collection.insertOne(data, callback)
         }
+    },
+    clearData: function clearData(collection, callback){
+        this.collection(collection).deleteMany({}, callback)
     }
 }
 module.exports = mongoWrapper
