@@ -72,7 +72,7 @@ mongo.clearData(collection, callback) // <- Clears all data in a collection
 
 ## Example Usage
 ```javascript
-const mongo = require("dalisra-mongo-wrapper")
+const mongo = require('dalisra-mongo-wrapper')
 const async = require('async')
 
 // keep trying to connect to mongodb on localhost with default parameters untill success
