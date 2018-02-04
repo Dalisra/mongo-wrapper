@@ -7,7 +7,7 @@ Simple mongodb wrapper
 
 ## Usage
 
-    const mongo = require("../index")
+    const mongo = require("dalisra-mongo-wrapper")
     const async = require('async')
 
     // keep trying to connect to mongodb on localhost with default parameters untill success
