@@ -112,6 +112,10 @@ var mongoWrapper = {
      */
     connect: function connect(callback) {
         _currentAttemptNr++
+        if(_config.connectionString){
+            //TODO: parse out database name?
+            _currentDatabase = null
+        }else _currentDatabase = _config.DATABASE
         MongoClient.connect(this.getConnectionString(), function (err, client) {
             if (err) return callback(err)
 
@@ -137,8 +141,10 @@ var mongoWrapper = {
      */
     db: function db(database){ 
         if(!this.client()) return null
-        _currentDatabase = database || _config.DATABASE
-        return this.client().db(_currentDatabase) 
+        if(database) {
+            _currentDatabase = database
+            return this.client().db(_currentDatabase)
+        }else return this.client().db() 
     },
     getConfig: function getConfig(){
         return _config
