@@ -165,7 +165,7 @@ var mongoWrapper = {
         return _config.connectionString
      },
      /**
-     * Handy shortcut to insert or update data for one or many object(s)
+     * Handy shortcut to insert or replace data for one or many object(s)
      * @param collection {String} name of the collection to instert to.
      * @param data {JSON|array} single Json object or array of Json objects.
      * @param callback {Promise} - returns err as first param and result as second.
@@ -199,7 +199,7 @@ var mongoWrapper = {
         if (data instanceof Array) data = data[0]
         // save single item to db
         //if _id is specified, we try to save it to database by matching _id and using upsert function
-        if (data._id) return collection.updateOne({'_id': data._id}, data, {'upsert': true}, callback)
+        if (data._id) return collection.replaceOne({'_id': data._id}, data, {'upsert': true}, callback)
         else return collection.insertOne(data, callback) //if it does not have _id we just insert it (insert will generate _id)
     },
 

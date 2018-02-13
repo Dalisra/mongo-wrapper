@@ -80,7 +80,7 @@ mongo.close() // <- Close db connection
 
 ### Data
 ```javascript
-mongo.saveData(collection, data, callback) // <- Shortcut to save (insert or update) data to database
+mongo.saveData(collection, data, callback) // <- Shortcut to save (insert or replaces) data to database
 mongo.updateData(collection, data, callback) // <- Updates data without resetting other fields. (_id field must be supplied)
 mongo.insertData(collection, data, callback) // <- Inserts new data to database. 
 mongo.clearData(collection, callback) // <- Clears all data in a collection
