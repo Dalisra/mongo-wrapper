@@ -9,17 +9,18 @@ var MongoClient = mongodb.MongoClient
 var async = require('async')
 
 var _currentAttemptNr = 0
-var _currentDatabase = null
 var _client = null
 var _config = {}
 var _defaultConfig = {
-    //connectionString: "mongodb://localhost:27017/test", //HOST and PORT is ignored when using this one.
-    HOST: 'localhost',
-    PORT: 27017,
-    DATABASE: 'test',
-    maxConnectAttempts: 0,
-    connectRetryDelay: 5000,
+    //connectionString: "mongodb://localhost:27017/test",
+    protocol: "mongodb", // if connectionString is provided this options is ignored
+    host: 'localhost', // if connectionString is provided this options is ignored
+    port: 27017, // if connectionString is provided this options is ignored
+    database: 'test', // default database to return, in 3.6 driver you can change database
+    maxConnectAttempts: 0, //how many times to try before giving up, 0 = never giveup.
+    connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
     afterConnect: function(client, callback){
+        // do something with the client before rest of the application gets access to it.
         callback()
     }
 }
@@ -141,16 +142,11 @@ var mongoWrapper = {
      */
     db: function db(database){ 
         if(!this.client()) return null
-        if(database) {
-            _currentDatabase = database
-            return this.client().db(_currentDatabase)
-        }else return this.client().db() 
+        if(database) return this.client().db(database) 
+        return this.client().db(_config.database) 
     },
     getConfig: function getConfig(){
         return _config
-    },
-    getCurrentDatabase: function getCurrentDatabase(){
-        return _currentDatabase
     },
     client: function client(){
         return _client
@@ -165,29 +161,27 @@ var mongoWrapper = {
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString : function(){
-        if(_config.connectionString) return _config.connectionString
-        return "mongodb://" + (_config.HOST || _defaultConfig.HOST) + ":" + (_config.PORT || _defaultConfig.PORT) + "/" + (_config.DATABASE || _defaultConfig.DATABASE)
-    },
-
-    /**
+        if(!_config.connectionString) _config.connectionString = (_config.protocol || _defaultConfig.protocol) + "://" + (_config.host || _defaultConfig.host) + ":" + (_config.port || _defaultConfig.port) + "/" + (_config.database || _defaultConfig.database)
+        return _config.connectionString
+     },
+     /**
      * Handy shortcut to insert or update data for one or many object(s)
      * @param collection {String} name of the collection to instert to.
      * @param data {JSON|array} single Json object or array of Json objects.
      * @param callback {Promise} - returns err as first param and result as second.
-     *
-     // Check state of result
-     assert.equal(2, result.nInserted)
-     assert.equal(1, result.nUpserted)
-     assert.equal(1, result.nMatched)
-     assert.ok(1 == result.nModified || result.nModified == null)
-     assert.equal(1, result.nRemoved)
-     var upserts = result.getUpsertedIds()
-     assert.equal(1, upserts.length)
-     assert.equal(2, upserts[0].index)
-     assert.ok(upserts[0]._id != null)
-     var upsert = result.getUpsertedIdAt(0)
-     assert.equal(2, upsert.index)
-     assert.ok(upsert._id != null)
+     * Check state of result
+     * assert.equal(2, result.nInserted)
+     * assert.equal(1, result.nUpserted)
+     * assert.equal(1, result.nMatched)
+     * assert.ok(1 == result.nModified || result.nModified == null)
+     * assert.equal(1, result.nRemoved)
+     * var upserts = result.getUpsertedIds()
+     * assert.equal(1, upserts.length)
+     * assert.equal(2, upserts[0].index)
+     * assert.ok(upserts[0]._id != null)
+     * var upsert = result.getUpsertedIdAt(0)
+     * assert.equal(2, upsert.index)
+     * assert.ok(upsert._id != null)
      */
     saveData : function (collection, data, callback) {
         var collection = this.collection(collection)

@@ -11,48 +11,65 @@ npm install dalisra-mongo-wrapper -S
 
 ## Connecting to database
 
-### Default
+### With Default Options
 
 ```javascript
 const mongo = require('dalisra-mongo-wrapper')
 // keep trying to connect untill success
-mongo.connectToMongo(() => {
-    // You are now connected to 'test' database
+mongo.connectToMongo((err) => {
+    // You are now connected to mongodb on localhost:27017 with 'test' database as default
 })
 ```
 
-### With connection string
+### With another database
+
 ```javascript
-mongo.connectToMongo("mongodb://localhost:27017/foo", () => {
-    // You are now connected to 'foo' database
+const mongo = require('dalisra-mongo-wrapper')
+// keep trying to connect untill success
+mongo.connectToMongo({
+    connectionString: 'mongodb://localhost:27017', // as of 3.6 you dont need to provide database in connection string
+    database: 'foo'
+}, (err) => {
+    // You are now connected to mongodb on localhost:27017 with 'foo' database as default
 })
 ```
 
-### With advanced configuration
+### With options
+
+Default options that you can override are:
 ```javascript
-mongo.connectoToMongo({
-    connectionString: "mongodb://localhost:27017/test",
+var options = {
+    connectionString: "" //Provide your own connection string, or dont define it and it will be generated for you using settings below.
+    protocol: "mongodb", // if connectionString is provided this options is ignored
+    host: 'localhost', // if connectionString is provided this options is ignored
+    port: 27017, // if connectionString is provided this options is ignored
+    database: 'test', // default database to return, in 3.6 driver you can change database after connecting to mongodb
     maxConnectAttempts: 0, //how many times to try before giving up, 0 = never giveup.
     connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
     afterConnect: function(client, callback){
-        //TODO: do something with the client before rest of the application gets access to it.
+        // do something with the client before rest of the application gets access to it.
         callback()
     }
-}, (err) => {
+```
+Once you override wanted options you can connect to database as follows:
+
+```javascript
+mongo.connectoToMongo(options, (err) => {
     if(err) {
         console.log("Reached maxConnectionAttempts, giving up..")
         throw err
     }
     
-    // You are now connected to database
+    // You are now successfully connected to database
 })
 ```
+
 ## Helper methods
 
 ### Utility
 ```javascript
 mongo.client() // <- MongoClient
-mongo.db() // <- Mongo database pointer.
+mongo.db() // <- Mongo database pointer to default database
 mongo.db('foo') // <- Change database and get database pointer
 mongo.collection('bar') // <- Get collection pointer.
 mongo.mongodb // <- Returns original MongoDb driver
