@@ -66,7 +66,7 @@ var mongoWrapper = {
         }
         if(typeof config === "string") config = { connectionString: config }
         
-        this.setConfig(config)
+        mongoWrapper.setConfig(config)
 
         async.whilst(
             function(){
@@ -117,7 +117,7 @@ var mongoWrapper = {
             //TODO: parse out database name?
             _currentDatabase = null
         }else _currentDatabase = _config.DATABASE
-        MongoClient.connect(this.getConnectionString(), function (err, client) {
+        MongoClient.connect(mongoWrapper.getConnectionString(), function (err, client) {
             if (err) return callback(err)
 
             _config.afterConnect(client, function(){
@@ -141,9 +141,9 @@ var mongoWrapper = {
      * @returns {*}
      */
     db: function db(database){ 
-        if(!this.client()) return null
-        if(database) return this.client().db(database) 
-        return this.client().db(_config.database) 
+        if(!mongoWrapper.client()) return null
+        if(database) return mongoWrapper.client().db(database) 
+        return mongoWrapper.client().db(_config.database) 
     },
     getConfig: function getConfig(){
         return _config
@@ -152,11 +152,11 @@ var mongoWrapper = {
         return _client
     },
     collection: function collection(collection){
-        if(!this.db()) return null
-        return this.db().collection(collection)
+        if(!mongoWrapper.db()) return null
+        return mongoWrapper.db().collection(collection)
     },
     close: function close(){
-        if(this.client()) this.client().close();
+        if(mongoWrapper.client()) mongoWrapper.client().close();
     },
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
@@ -184,7 +184,7 @@ var mongoWrapper = {
      * assert.ok(upsert._id != null)
      */
     saveData : function (collection, data, callback) {
-        var collection = this.collection(collection)
+        var collection = mongoWrapper.collection(collection)
         //if data that we want to save is an array and has more than one item we itterate and save them in batch job.
         if (data instanceof Array && data.length > 1) {
             var batch = collection.initializeUnorderedBulkOp({useLegacyOps: true})
@@ -209,7 +209,7 @@ var mongoWrapper = {
     updateData : function(collection, data, callback){
         if(data instanceof Array) return callback(new Error("Arrays are not supported yet for updating"))
         if(!data._id) return callback(new Error("Missing ID.."))
-        var collection = this.db().collection(collection)
+        var collection = mongoWrapper.db().collection(collection)
         collection.findOneAndUpdate({_id: data._id}, {$set:data}, { returnOriginal:false, upsert:true }, callback)
     },
     /**
@@ -219,7 +219,7 @@ var mongoWrapper = {
      * @param callback {Promise} - returns err as first param and result as second.
      */
     insertData : function (collection, data, callback) {
-        var collection = this.db().collection(collection)
+        var collection = mongoWrapper.db().collection(collection)
         if (data instanceof Array) {
             collection.insertMany(data, callback)
         } else {
@@ -227,7 +227,7 @@ var mongoWrapper = {
         }
     },
     clearData: function clearData(collection, callback){
-        this.collection(collection).deleteMany({}, callback)
+        mongoWrapper.collection(collection).deleteMany({}, callback)
     }
 }
 module.exports = mongoWrapper
