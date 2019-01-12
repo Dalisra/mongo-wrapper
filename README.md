@@ -137,3 +137,8 @@ mongo.connectToMongo((err) => {
 * mongo.delete('collection', {foo:'bar'})
 * mongo.deleteOne('collection', {_id:'123'})
 ```
+
+## Updates
+* 2.2.0
+    Updated packages to latest.
+    Fixed autoreconnect, changed some debug logging to warn / info.

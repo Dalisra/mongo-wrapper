@@ -1,5 +1,6 @@
 var log = {
     error: console.error,
+    info: console.log,
     debug: console.log,
     warn: console.log,
     fatal: console.error
@@ -10,6 +11,7 @@ var async = require('async')
 
 var _currentAttemptNr = 0
 var _client = null
+var _isConnected = false
 var _config = {}
 var _defaultConfig = {
     //connectionString: "mongodb://localhost:27017/test",
@@ -31,15 +33,15 @@ var mongoWrapper = {
         if(config){
             if(config.afterConnect && typeof config.afterConnect !== "function") {
                 delete config.afterConnect
-                log.debug("WARN: config.afterConnect should be a function. Ignoring.")
+                log.warn("WARN: config.afterConnect should be a function. Ignoring.")
             }
             if(config.connectRetryDelay && typeof config.connectRetryDelay !== "number"){
                 delete config.connectRetryDelay
-                log.debug("WARN: config.connectRetryDelay should be a number. Ignoring.")
+                log.warn("WARN: config.connectRetryDelay should be a number. Ignoring.")
             }
             if(config.maxConnectAttempts && typeof config.maxConnectAttempts !== "number"){
                 delete config.maxConnectAttempts
-                log.debug("WARN: config.maxConnectAttempts should be a number. Ignoring.")
+                log.warn("WARN: config.maxConnectAttempts should be a number. Ignoring.")
             }
             if(config.log){
                 //using this logger internaly for all logs
@@ -119,9 +121,20 @@ var mongoWrapper = {
         }else _currentDatabase = _config.DATABASE
         MongoClient.connect(mongoWrapper.getConnectionString(), function (err, client) {
             if (err) return callback(err)
-
+            _isConnected = true
             _config.afterConnect(client, function(){
                 _client = client
+
+                _client.on('close', () => { 
+                    _isConnected = false
+                    _currentAttemptNr = 0
+                    _client = null
+                    log.warn("Connection to mongoDB has been lost. Trying to reconnect.")
+                    mongoWrapper.connectToMongo(_config, () => {
+                        log.info("Successfully reconnected.")
+                    })
+                })
+
                 return callback()
             })
         })
@@ -132,8 +145,7 @@ var mongoWrapper = {
      * @return {boolean}
      */
     isConnected: function isConnected() {
-        if (_client) return true
-        return false
+        return _isConnected;
     },
 
     /**
