@@ -1,19 +1,17 @@
-var log = {
+ let log = {
     error: console.error,
     info: console.log,
     debug: console.log,
     warn: console.log,
     fatal: console.error
 }
-var mongodb = require('mongodb')
-var MongoClient = mongodb.MongoClient
-var async = require('async')
+const mongodb = require('mongodb')
+const MongoClient = mongodb.MongoClient
 
-var _currentAttemptNr = 0
-var _client = null
-var _isConnected = false
-var _config = {}
-var _defaultConfig = {
+let _currentAttemptNr = 0
+let _client = null
+let _config = {}
+const _defaultConfig = {
     //connectionString: "mongodb://localhost:27017/test",
     protocol: "mongodb", // if connectionString is provided this options is ignored
     host: 'localhost', // if connectionString is provided this options is ignored
@@ -24,10 +22,11 @@ var _defaultConfig = {
     afterConnect: function(client, callback){
         // do something with the client before rest of the application gets access to it.
         callback()
-    }
+    },
+    reconnect: true // what to do if connection to database closes. (on 'close' event)
 }
 
-var mongoWrapper = {
+const mongoWrapper = {
 
     setConfig : function(config){
         if(config){
@@ -48,17 +47,17 @@ var mongoWrapper = {
                 log = config.log
                 delete config.log
             }
-            _config = Object.assign(_defaultConfig, _config, config)
+            _config = Object.assign({}, _defaultConfig, _config, config)
         }
-        else _config = Object.assign(_defaultConfig, _config)
+        else _config = Object.assign({}, _defaultConfig, _config)
     },
 
     /** Method that tries to connect to mongo, and retries if it fails.
      * callback will be called only once it has been successfull to connect to database.
      * Config contains has:
-     * @param HOST - default 'localhost'
-     * @param PORT - default 27017
-     * @param DATABASE - default 'test'
+     * @param host - default 'localhost'
+     * @param port - default 27017
+     * @param database - default 'test'
      * @param afterConnect - function that is called after success connection, this function is called with 2 params: client & callback
      */
     connectToMongo: function connectToMongo(config, callback) {
@@ -67,41 +66,8 @@ var mongoWrapper = {
             config = {}
         }
         if(typeof config === "string") config = { connectionString: config }
-        
         mongoWrapper.setConfig(config)
-
-        async.whilst(
-            function(){
-                if(mongoWrapper.isConnected()) return false
-                else return true
-            },
-            function(next){
-                mongoWrapper.connect(function(err){
-                    if (err) {
-                        log.error("Cannot connect to MongoDB! Check that mongo is running..", err)
-
-                        //check if we reached max attempts and end with error
-                        if(_config.maxConnectAttempts && _config.maxConnectAttempts !== 0 && _config.maxConnectAttempts <= _currentAttemptNr) {
-                            return next(new Error("Maximum connection attempts reached, giving up."))
-                        }
-                        //if We encountered error.. we try to reconnect after some time..
-                        setTimeout(function () {
-                            log.debug("Trying to reconnect.. Attempt nr:" + (_currentAttemptNr+1))
-                            next()
-                        }, _config.connectRetryDelay || 5000)
-                    } else {
-                        log.debug("Success! connected to Mongo!")
-                        next()
-                    }
-                })
-            },
-            function(err){
-                if(err) log.error("Connection to mongoDB failed and will not try to connect anymore after " + _currentAttemptNr + " retries. Restart needed!", err)
-                else log.debug("Successfully finishing mongo connect method after " + _currentAttemptNr + " tries.")
-                _currentAttemptNr = 0
-                if(callback) callback(err)
-            }
-        )
+        mongoWrapper.connect(callback)
     },
 
     /** Main method to connect to server,
@@ -118,34 +84,43 @@ var mongoWrapper = {
         if(_config.connectionString){
             //TODO: parse out database name?
             _currentDatabase = null
-        }else _currentDatabase = _config.DATABASE
-        MongoClient.connect(mongoWrapper.getConnectionString(), function (err, client) {
-            if (err) return callback(err)
-            _isConnected = true
-            _config.afterConnect(client, function(){
-                _client = client
+        }else _currentDatabase = _config.database
+        let url = mongoWrapper.getConnectionString()
+        log.debug("Setting up new MongoClient with url: " + url)
+        let client = new MongoClient(url, {useNewUrlParser:true, useUnifiedTopology:true})
+        client.connect(function (err) {
+            if (err){
+                log.error("Cannot connect to MongoDB! Check that mongo is running..", err)
+                //check if we reached max attempts and end with error
+                if(_config.maxConnectAttempts && _config.maxConnectAttempts !== 0 && _config.maxConnectAttempts <= _currentAttemptNr) {
+                    log.error("Connection to mongoDB failed and will not try to connect anymore after " + _currentAttemptNr + " retries. Restart needed!", err)
+                    if(callback) return callback(new Error("Maximum connection attempts reached, giving up."))
+                    else return
+                }
+                //if We encountered error.. we try to reconnect after some time..
+                setTimeout(() => {
+                    log.debug("Trying to reconnect.. Attempt nr: " + (_currentAttemptNr+1) + " after waiting: " + _config.connectRetryDelay || 5000)
+                    mongoWrapper.connect(callback)
+                }, _config.connectRetryDelay || 5000)
+                return
+            }
 
-                _client.on('close', () => { 
-                    _isConnected = false
+            if(client) {
+                _config.afterConnect(client, function(){
+                    _client = client
+                    if(_config.reconnect){
+                        _client.on('close', mongoWrapper.reconnect)
+                    }
+                    log.debug("Successfully finishing mongo connect method after " + _currentAttemptNr + " tries.")
                     _currentAttemptNr = 0
-                    _client = null
-                    log.warn("Connection to mongoDB has been lost. Trying to reconnect.")
-                    mongoWrapper.connectToMongo(_config, () => {
-                        log.info("Successfully reconnected.")
-                    })
+                    if(callback) callback(null, _client)
                 })
-
-                return callback()
-            })
+            }
         })
     },
-
-    /**
-     * Tells if we are connected to database.
-     * @return {boolean}
-     */
-    isConnected: function isConnected() {
-        return _isConnected;
+    reconnect: function reconnect(){
+        log.debug("Lost connection to Database, trying to reconnect.")
+        mongoWrapper.connectToMongo()
     },
 
     /**
@@ -168,13 +143,19 @@ var mongoWrapper = {
         return mongoWrapper.db().collection(collection)
     },
     close: function close(){
-        if(mongoWrapper.client()) mongoWrapper.client().close();
+        if(mongoWrapper.client()){
+            mongoWrapper.client().removeListener('close', mongoWrapper.reconnect)
+            mongoWrapper.client().close()
+        } 
     },
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString : function(){
         if(!_config.connectionString) _config.connectionString = (_config.protocol || _defaultConfig.protocol) + "://" + (_config.host || _defaultConfig.host) + ":" + (_config.port || _defaultConfig.port) + "/" + (_config.database || _defaultConfig.database)
         return _config.connectionString
+     },
+     resetConfig(){
+         _config = null
      },
      /**
      * Handy shortcut to insert or replace data for one or many object(s)
