@@ -14,11 +14,21 @@ npm install dalisra-mongo-wrapper -S
 ### With Default Options
 
 ```javascript
+// Callback based:
 const mongo = require('dalisra-mongo-wrapper')
 // keep trying to connect untill success
-mongo.connectToMongo((err) => {
+mongo.connectToMongo(() => {
     // You are now connected to mongodb on localhost:27017 with 'test' database as default
 })
+
+// Promise based:
+mongo.connectToMongo().then(client => {
+    // You are now connected to mongodb...
+})
+
+// In async function:
+let client = await mongo.connectToMongo()
+// You are now connected to mongodb..
 ```
 
 ### With another database
@@ -39,17 +49,13 @@ mongo.connectToMongo({
 Default options that you can override are:
 ```javascript
 var options = {
-    connectionString: "" //Provide your own connection string, or dont define it and it will be generated for you using settings below.
+    connectionString: "", //Provide your own connection string, or dont define it and it will be generated for you using settings below.
     protocol: "mongodb", // if connectionString is provided this options is ignored
     host: 'localhost', // if connectionString is provided this options is ignored
     port: 27017, // if connectionString is provided this options is ignored
     database: 'test', // default database to return, in 3.6 driver you can change database after connecting to mongodb
     maxConnectAttempts: 0, //how many times to try before giving up, 0 = never giveup.
     connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
-    afterConnect: function(client, callback){
-        // do something with the client before rest of the application gets access to it.
-        callback()
-    },
     reconnect: true // what to do if connection to database closes. (on 'close' event)
 }
 ```
@@ -86,7 +92,6 @@ mongo.updateData(collection, data, callback) // <- Updates data without resettin
 mongo.insertData(collection, data, callback) // <- Inserts new data to database. 
 mongo.clearData(collection, callback) // <- Clears all data in a collection
 ```
-
 
 ## Example Usage
 ```javascript
