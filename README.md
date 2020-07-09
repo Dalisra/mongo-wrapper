@@ -48,26 +48,32 @@ mongo.connectToMongo({
 
 Default options that you can override are:
 ```javascript
-var options = {
-    connectionString: "", //Provide your own connection string, or dont define it and it will be generated for you using settings below.
+const options = {
+    connectionString: "mongodb://localhost:27017/test", //Generated automatically if not specified.
     protocol: "mongodb", // if connectionString is provided this options is ignored
     host: 'localhost', // if connectionString is provided this options is ignored
     port: 27017, // if connectionString is provided this options is ignored
-    database: 'test', // default database to return, in 3.6 driver you can change database after connecting to mongodb
+    database: 'test', // default database to return, since 3.6 driver you can change database
     maxConnectAttempts: 0, //how many times to try before giving up, 0 = never giveup.
     connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
-    reconnect: true // what to do if connection to database closes. (on 'close' event)
+    reconnect: true, // what to do if connection to database closes. (on 'disconnect' event)
+    log:{
+        debug: console.log,
+        error: console.error
+    },
+    mongoClientOptions : {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    }
 }
 ```
 Once you override wanted options you can connect to database as follows:
 
 ```javascript
-mongo.connectoToMongo(options, (err) => {
-    if(err) {
-        console.log("Reached maxConnectionAttempts, giving up..")
-        throw err
-    }
+mongo.connectoToMongo(options).then(() => {
     // You are now successfully connected to database
+}).catch(err => {
+    //Reached maxConnectionAttempts, giving up..
 })
 ```
 
@@ -145,6 +151,10 @@ mongo.connectToMongo((err) => {
 ```
 
 ## Updates
+* 3.1.0
+    Cleaned up code.
+    Updated libraries.
+    Implemented promises.
 * 3.0.0
     Updated packages to latest. Removed dependency to async library.
 * 2.2.0

@@ -15,10 +15,10 @@ const defaultConfig = {
     connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
     reconnect: true, // what to do if connection to database closes. (on 'close' event)
     log,
-    mongoClientOptions : {
+    mongoClientOptions: {
         useNewUrlParser: true,
-        useUnifiedTopology: true
-    }
+        useUnifiedTopology: true,
+    },
 }
 
 let _client = null
@@ -87,7 +87,7 @@ const mongoWrapper = {
      */
     connect: async callback => {
         let url = mongoWrapper.getConnectionString()
-        let client = new MongoClient(url, mongoWrapper.config.mongoConfig)
+        let client = new MongoClient(url, mongoWrapper.config.mongoClientOptions)
         if (mongoWrapper.config.maxConnectAttempts === 0 || mongoWrapper.config.maxConnectAttempts > mongoWrapper.currentAttemptNr) {
             try {
                 mongoWrapper.currentAttemptNr++
