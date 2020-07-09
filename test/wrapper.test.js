@@ -1,13 +1,15 @@
 const chai = require('chai')
-var mongodb = require('mongodb')
 const expect = chai.expect
-
-var sinon = require('sinon')
-
 const mongo = require('../index')
-describe('Negative Wrapper Tests', function(){
 
-    it("Test default / null values before connecting", function(done){
+describe('Tests before connecting to database', function(){
+
+    beforeEach(function(){
+        console.log("Resetting mongodb.")
+        mongo.resetConfig()
+    })
+
+    it("Test default / null values", function(done){
         expect(mongo.db()).to.be.null
         expect(mongo.db('foo')).to.be.null
         expect(mongo.client()).to.be.null
@@ -18,13 +20,16 @@ describe('Negative Wrapper Tests', function(){
     })
 
     it('Testing maxNumberOfAttempts', function(done){
-        this.timeout(50000)
-        mongo.resetConfig()
-
+        this.timeout(10000)
         mongo.connectToMongo({
             port: 27018,
-            connectRetryDelay: 100,
-            maxConnectAttempts: 5,
+            connectRetryDelay: 500,
+            maxConnectAttempts: 3,
+            mongoClientOptions: {
+                connectTimeoutMS: 100,
+                serverSelectionTimeoutMS: 500,
+                reconnectTries: 0
+            }
             //log: { debug: ()=>{}, error: ()=>{}, warn: ()=>{}, fatal: ()=>{} } // to prevent logs while testing.
         }, function(err){
 
@@ -46,14 +51,29 @@ describe('Negative Wrapper Tests', function(){
 
 describe('Positive Wrapper Tests', function(){
     before(function(done){
-        //TODO: connect to mongo
+        mongo.connectToMongo({}).then(()=>done())
+    })
+
+    it("validate that we are connected", function(done){
+        expect(mongo.client()).to.not.be.null
         done()
     })
 
-    it("validate that we are connected")
+    it("clear data", function(done){
+        mongo.clearData('test').then(() => done())
+    })
 
 
-    it("insert one document using saveData")
+    it("insert one document using saveData", function (done) {
+        mongo.saveData('test', {a:1, b:2})
+            .then(()=> mongo.collection('test').find({a:1}).toArray())
+            .then((data) => {
+                expect(data).to.be.array.of.length(1)
+                expect(data.a).to.be.equal(1)
+                expect(data.b).to.be.equal(2)
+                expect(data._id).to.exist()
+            })
+    })
     it("insert several documents using saveData")
 
     it("insert one document using insertData")

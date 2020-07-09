@@ -14,10 +14,15 @@ const defaultConfig = {
     maxConnectAttempts: 0, //how many times to try before giving up, 0 = never giveup.
     connectRetryDelay: 5000, // how many miliseconds to wait after each failed attempt to connect
     reconnect: true, // what to do if connection to database closes. (on 'close' event)
-    log
+    log,
+    mongoClientOptions : {
+        useNewUrlParser: true,
+        useUnifiedTopology: true
+    }
 }
 
-async function sleep(msec) {
+let _client = null
+const sleep = async msec => {
     return new Promise(resolve => setTimeout(resolve, msec))
 }
 
@@ -25,7 +30,7 @@ const mongoWrapper = {
     currentAttemptNr: 0,
     config: {},
     defaultConfig,
-    setConfig(config) {
+    setConfig: config => {
         if (config) {
             if (config.afterConnect && typeof config.afterConnect !== "function") {
                 delete config.afterConnect
@@ -44,6 +49,10 @@ const mongoWrapper = {
                 if (config.log && config.log.debug) log.debug = config.log.debug
                 delete config.log
             }
+            if(config.mongoClientOptions){
+                mongoWrapper.config.mongoClientOptions = Object.assign({}, defaultConfig.mongoClientOptions, mongoWrapper.config.mongoClientOptions, config.mongoClientOptions)
+                delete config.mongoClientOptions
+            }
             mongoWrapper.config = Object.assign({}, defaultConfig, mongoWrapper.config, config)
         }
         else mongoWrapper.config = Object.assign({}, defaultConfig, mongoWrapper.config)
@@ -57,7 +66,7 @@ const mongoWrapper = {
      * @param {mongoWrapperCallback} [callback]
      * @return {Promise} If no callback specified a promise is returned.
      */
-    connectToMongo(config, callback) {
+    connectToMongo: (config, callback) => {
         if (typeof config === "function" && !callback) {
             callback = config
             config = {}
@@ -76,23 +85,21 @@ const mongoWrapper = {
      * If connection breaks for some reason, application also might want to reconnect using this method.
      * @param callback
      */
-    async connect(callback) {
+    connect: async callback => {
         let url = mongoWrapper.getConnectionString()
-        mongoWrapper.client = new MongoClient(url, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true
-        })
-        if (mongoWrapper.config.maxConnectAttempts === 0 || mongoWrapper.config.maxConnectAttempts <= mongoWrapper.currentAttemptNr) {
+        let client = new MongoClient(url, mongoWrapper.config.mongoConfig)
+        if (mongoWrapper.config.maxConnectAttempts === 0 || mongoWrapper.config.maxConnectAttempts > mongoWrapper.currentAttemptNr) {
             try {
                 mongoWrapper.currentAttemptNr++
                 log.debug("Trying to connect, attempt nr: " + mongoWrapper.currentAttemptNr + "")
                 //connect to database
-                await mongoWrapper.client.connect()
-                mongoWrapper.client.on('disconnected', mongoWrapper.reconnect)
+                await client.connect()
+                client.on('disconnected', mongoWrapper.reconnect)
+                _client = client
                 log.debug("Successfully finishing mongo connect method after " + mongoWrapper.currentAttemptNr + " tries.")
                 mongoWrapper.currentAttemptNr = 0
-                if (callback) callback(null, mongoWrapper.client)
-                else return mongoWrapper.client
+                if (callback) callback(null, _client)
+                else return _client
             } catch (err) {
                 console.error("Cannot connect to MongoDB! Check that mongo is running..", err)
                 await sleep(mongoWrapper.config.connectRetryDelay)
@@ -102,30 +109,29 @@ const mongoWrapper = {
             }
         } else {
             console.error("Connection to mongoDB failed and will not try to connect anymore after " + mongoWrapper.currentAttemptNr + " retries. Restart needed!")
-            throw new Error("Maximum connection attempts reached, giving up.")
+            let err = new Error("Maximum connection attempts reached, giving up.")
+            if(callback) return callback(err)
+            else throw err
         }
     },
-    reconnect() {
+    reconnect: () => {
         if(mongoWrapper.config.reconnect){
             console.log("Lost connection to Database, trying to reconnect.")
-            mongoWrapper.client.removeListener('disconnected', mongoWrapper.reconnect)
+            if(mongoWrapper.client()) mongoWrapper.client().removeListener('disconnected', mongoWrapper.reconnect)
             mongoWrapper.connectToMongo()
         }
     },
-    db: (database) => mongoWrapper.client.db(database),
-    collection: (collection) => mongoWrapper.db.collection(collection),
-    close(){
-        return mongoWrapper.client.close(...arguments)
-    },
+    client: () => _client,
+    db: database => mongoWrapper.client() ? mongoWrapper.client().db(database) : null,
+    collection: collection => mongoWrapper.db() ? mongoWrapper.db().collection(collection) : null,
+    close: (force, callback) => mongoWrapper.client().close(force, callback),
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
-    getConnectionString: function () {
+    getConnectionString: () => {
         if (!mongoWrapper.config.connectionString) mongoWrapper.config.connectionString = (mongoWrapper.config.protocol || defaultConfig.protocol) + "://" + (mongoWrapper.config.host || defaultConfig.host) + ":" + (mongoWrapper.config.port || defaultConfig.port) + "/" + (mongoWrapper.config.database || defaultConfig.database)
         return mongoWrapper.config.connectionString
     },
-    resetConfig() {
-        mongoWrapper.config = Object.assign({}, defaultConfig)
-    },
+    resetConfig: () => { mongoWrapper.config = Object.assign({}, defaultConfig) },
     /**
      * Handy shortcut to insert or replace data for one or many object(s)
      * @param collection {String} name of the collection to instert to.
@@ -145,11 +151,10 @@ const mongoWrapper = {
      * assert.equal(2, upsert.index)
      * assert.ok(upsert._id != null)
      */
-    saveData: function (collection, data, callback) {
-        var collection = mongoWrapper.collection(collection)
+    saveData: (collection, data, callback) => {
         //if data that we want to save is an array and has more than one item we itterate and save them in batch job.
         if (data instanceof Array && data.length > 1) {
-            var batch = collection.initializeUnorderedBulkOp({useLegacyOps: true})
+            var batch = mongoWrapper.collection(collection).initializeUnorderedBulkOp({useLegacyOps: true})
             for (var i in data) {
                 var item = data[i]
                 if (item._id) batch.find({'_id': item._id}).upsert().updateOne(item)
@@ -161,17 +166,17 @@ const mongoWrapper = {
         if (data instanceof Array) data = data[0]
         // save single item to db
         //if _id is specified, we try to save it to database by matching _id and using upsert function
-        if (data._id) return collection.replaceOne({'_id': data._id}, data, {'upsert': true}, callback)
-        else return collection.insertOne(data, callback) //if it does not have _id we just insert it (insert will generate _id)
+        if (data._id) return mongoWrapper.collection(collection).replaceOne({'_id': data._id}, data, {'upsert': true}, callback)
+        else return mongoWrapper.collection(collection).insertOne(data, callback) //if it does not have _id we just insert it (insert will generate _id)
     },
     /**
      * Updates data without resetting other fields.
      */
-    updateData: function (collection, data, callback) {
+    updateData: (collection, data, callback) => {
         if (data instanceof Array) return callback(new Error("Arrays are not supported yet for updating"))
         if (!data._id) return callback(new Error("Missing ID.."))
-        var collection = mongoWrapper.db().collection(collection)
-        collection.findOneAndUpdate({_id: data._id}, {$set: data}, {returnOriginal: false, upsert: true}, callback)
+
+        return mongoWrapper.collection(collection).findOneAndUpdate({_id: data._id}, {$set: data}, {returnOriginal: false, upsert: true}, callback)
     },
     /**
      * Handy shortcut to insert new row(s) into mongo db
@@ -179,17 +184,16 @@ const mongoWrapper = {
      * @param data {JSON} single Json object.
      * @param callback {Promise} - returns err as first param and result as second.
      */
-    insertData: function (collection, data, callback) {
-        var collection = mongoWrapper.db().collection(collection)
+    insertData: (collection, data, callback) => {
         if (data instanceof Array) {
-            collection.insertMany(data, callback)
+            return mongoWrapper.collection(collection).insertMany(data, callback)
         } else {
-            collection.insertOne(data, callback)
+            return  mongoWrapper.collection(collection).insertOne(data, callback)
         }
     },
     /** Handy shortcust to clear data in one collection */
-    clearData: function clearData(collection, callback) {
-        mongoWrapper.collection(collection).deleteMany({}, callback)
+    clearData: (collection, callback) => {
+        return mongoWrapper.collection(collection).deleteMany({}, callback)
     }
 }
 module.exports = mongoWrapper
