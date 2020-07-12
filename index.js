@@ -42,7 +42,6 @@ let _client = null
  * @param {mongoCallback} [callback]
  * @return {Promise} If no callback specified a promise is returned.
  */
-
 const connectToMongo = async (config, callback) => {
     if (typeof config === "function" && !callback) {
         callback = config
@@ -66,18 +65,48 @@ const connectToMongo = async (config, callback) => {
             if (callback) callback(null, _client)
             else return _client
         } catch (err) {
-            console.error("Cannot connect to MongoDB! Check that mongo is running..", err)
+            log.error("Cannot connect to MongoDB! Check that mongo is running..", err)
             await sleep(mongo.config.connectRetryDelay)
 
-            if (callback) return connectToMongo(config, callback)
-            else return await mongo.connect()
+            if (callback) return connectToMongo(callback)
+            else return mongo.connect()
         }
     } else {
-        console.error("Connection to mongoDB failed and will not try to connect anymore after " + mongo.currentAttemptNr + " retries. Restart needed!")
+        log.error("Connection to mongoDB failed and will not try to connect anymore after " + mongo.currentAttemptNr + " retries. Restart needed!")
         let err = new Error("Maximum connection attempts reached, giving up.")
         if(callback) return callback(err)
         else throw err
     }
+}
+
+/**
+ * Handy shortcut to insert or update data (unordered) for one or many object(s).
+ * @param collection {String} name of the collection to instert to.
+ * @param data {JSON|array} single Json object or array of Json objects.
+ * @param {Collection~bulkWriteOpCallback} [callback] The command result callback
+ * @return {Promise} - If no callback, promise is returned.
+ */
+const saveData = (collection, data, callback) => {
+    //if data that we want to save is an array and has more than one item we itterate and save them in batch job.
+    if (Array.isArray(data) && data.length > 1) {
+        let operations = []
+        for (let i in data) {
+            let item = data[i]
+            if (item._id) {
+                let filter = {_id:item._id}
+                delete item._id
+                operations.push({updateOne: {filter:{_id:item._id}}, update:{$set: item}, upsert:true })
+            }
+            else operations.push({insertOne: {document: item} })
+        }
+        return mongo.collection(collection).bulkWrite(operations, {ordered:false}, callback)
+    }
+    //if it is an array, is must have only one item, lets get this item out of the array
+    if (Array.isArray(data)) data = data[0]
+    // save single item to db
+    //if _id is specified, we try to save it to database by matching _id and using upsert function
+    if (data._id) return mongo.collection(collection).updateOne({"_id": data._id}, {$set:data}, {"upsert": true}, callback)
+    else return mongo.collection(collection).insertOne(data, callback) //if it does not have _id we just insert it (insert will generate _id)
 }
 
 const mongo = {
@@ -88,17 +117,13 @@ const mongo = {
     defaultConfig,
     setConfig: config => {
         if (config) {
-            if (config.afterConnect && typeof config.afterConnect !== "function") {
-                delete config.afterConnect
-                console.log("WARN: config.afterConnect should be a function. Ignoring.")
-            }
             if (config.connectRetryDelay && typeof config.connectRetryDelay !== "number") {
                 delete config.connectRetryDelay
-                console.log("WARN: config.connectRetryDelay should be a number. Ignoring.")
+                log.debug("WARN: config.connectRetryDelay should be a number. Ignoring.")
             }
             if (config.maxConnectAttempts && typeof config.maxConnectAttempts !== "number") {
                 delete config.maxConnectAttempts
-                console.log("WARN: config.maxConnectAttempts should be a number. Ignoring.")
+                log.debug("WARN: config.maxConnectAttempts should be a number. Ignoring.")
             }
             if (config.log) {
                 if (config.log.error) log.error = config.log.error
@@ -109,13 +134,14 @@ const mongo = {
                 mongo.config.mongoClientOptions = Object.assign({}, defaultConfig.mongoClientOptions, mongo.config.mongoClientOptions, config.mongoClientOptions)
                 delete config.mongoClientOptions
             }
+            mongo.config.connectionString = null
             mongo.config = Object.assign({}, defaultConfig, mongo.config, config)
         }
         else mongo.config = Object.assign({}, defaultConfig, mongo.config)
     },
     reconnect: () => {
         if(mongo.config.reconnect){
-            console.log("Lost connection to Database, trying to reconnect.")
+            log.debug("Lost connection to Database, trying to reconnect.")
             if(mongo.client()) mongo.client().removeListener("disconnected", mongo.reconnect)
             mongo.connectToMongo()
         }
@@ -131,32 +157,7 @@ const mongo = {
         return mongo.config.connectionString
     },
     resetConfig: () => { mongo.config = Object.assign({}, defaultConfig) },
-
-    /**
-     * Handy shortcut to insert or update data (unordered) for one or many object(s).
-     * @param collection {String} name of the collection to instert to.
-     * @param data {JSON|array} single Json object or array of Json objects.
-     * @param {Collection~bulkWriteOpCallback} [callback] The command result callback
-     * @return {Promise} - If no callback, promise is returned.
-     */
-    saveData: (collection, data, callback) => {
-        //if data that we want to save is an array and has more than one item we itterate and save them in batch job.
-        if (Array.isArray(data) && data.length > 1) {
-            let operations = []
-            for (let i in data) {
-                let item = data[i]
-                if (item._id) operations.push({updateOne: {filter:{_id:mongo.ObjectID(item._id)}}, update:{$set: item}, upsert:true })
-                else operations.push({insertOne: {document: item} })
-            }
-            return mongo.collection(collection).bulkWrite(operations, {ordered:false}, callback)
-        }
-        //if it is an array, is must have only one item, lets get this item out of the array
-        if (Array.isArray(data)) data = data[0]
-        // save single item to db
-        //if _id is specified, we try to save it to database by matching _id and using upsert function
-        if (data._id) return mongo.collection(collection).updateOne({"_id": data._id}, {$set:data}, {"upsert": true}, callback)
-        else return mongo.collection(collection).insertOne(data, callback) //if it does not have _id we just insert it (insert will generate _id)
-    },
+    saveData,
     /** Handy shortcust to clear data in one collection */
     clearData: (collection, callback) => {
         return mongo.collection(collection).deleteMany({}, callback)
