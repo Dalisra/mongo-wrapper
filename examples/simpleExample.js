@@ -1,4 +1,4 @@
-const mongo = require('../index')
+const mongo = require("../index")
 
 mongo.connectToMongo({
     database: null

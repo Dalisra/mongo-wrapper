@@ -1,49 +1,25 @@
-const mongo = require('../index')
-const test = require('assert')
+const mongo = require("../index")
+const test = require("assert")
 
 
-async function clearProducts() {
+function clearProducts() {
 // lets clear all the data in products collection
-    return new Promise((resolve, reject) => {
-        mongo.clearData('products', (err, result) => {
-    
-            if(err) return reject(err)
-            console.log("Result: " + JSON.stringify(result))
-            return resolve(result)
-        })
-    })
+    console.log("Clearing products..")
+    return mongo.clearData("products")
 }
 
-async function insertProducts() {
-    return new Promise((resolve, reject) => {
-        // lets add a product
-        mongo.saveData('products', {number: 123, name:"Product 123"}, (err, result) => {
-            if(err) {
-                console.error("MongoDb returned error: ", err)
-                return reject(err)
-            }
-            console.log("Products created: " + JSON.stringify(result.ops))
-            resolve(result)
-        })
-    })
+function insertProducts() {
+    console.log("Inserting products..")
+    return mongo.saveData("products", {number: 123, name:"Product 123"})
 }
 
-async function findProducts(){
-    return new Promise((resolve, reject) => {
-    // lets find all products in products collection
-        mongo.collection('products').find({}).toArray((err, products) => {
-            if(err) {
-                console.error("MongoDb returned error: ", err)
-                return reject(err)
-            }
-            console.log("Got following products from database: " + JSON.stringify(products))
-            resolve(products)
-        })
-    })
+function findProducts(){
+    console.log("Finding products..")
+    return mongo.collection("products").find({}).toArray()
 }
 
 async function runTest(err) {
-    if(err) throw err // <- It is possible to config 'give up conditions'.
+    if(err) throw err // <- if maxConnectAttempts reached.
 
     let result = await clearProducts()
     test.ok(result != null)
@@ -52,10 +28,13 @@ async function runTest(err) {
     test.ok(result2.insertedCount == 1)
 
     let result3 = await findProducts()
+    console.log("Found products: " + JSON.stringify(result3))
     test.ok(result3.length = 1)
     test.ok(result3[0].number = "123")
+    test.ok(result3[0].name = "Product 123")
 
-    mongo.close()
+    console.log("Closing mongodb connection..")
+    await mongo.close()
 }
 
 mongo.connectToMongo({maxConnectAttempts:5}, runTest)
