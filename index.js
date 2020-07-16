@@ -48,7 +48,7 @@ const connectToMongo = async (config, callback) => {
         config = {}
     }
     if (typeof config === "string") config = {connectionString: config}
-    mongo.setConfig(config)
+    if(config) mongo.setConfig(config)
 
     let url = mongo.getConnectionString()
     let client = new MongoClient(url, mongo.config.mongoClientOptions)
@@ -58,7 +58,8 @@ const connectToMongo = async (config, callback) => {
             log.debug("Trying to connect, attempt nr: " + mongo.currentAttemptNr + "")
             //connect to database
             await client.connect()
-            client.on("disconnected", mongo.reconnect)
+            client.once("disconnected", mongo.onDisconnect)
+            client.once("close", () => _client = null)
             _client = client
             log.debug("Successfully finishing mongo connect method after " + mongo.currentAttemptNr + " tries.")
             mongo.currentAttemptNr = 0
@@ -68,8 +69,8 @@ const connectToMongo = async (config, callback) => {
             log.error("Cannot connect to MongoDB! Check that mongo is running..", err)
             await sleep(mongo.config.connectRetryDelay)
 
-            if (callback) return connectToMongo(callback)
-            else return mongo.connect()
+            if (callback) return connectToMongo(config, callback)
+            else return await connectToMongo(config)
         }
     } else {
         log.error("Connection to mongoDB failed and will not try to connect anymore after " + mongo.currentAttemptNr + " retries. Restart needed!")
@@ -95,7 +96,7 @@ const saveData = (collection, data, callback) => {
             if (item._id) {
                 let filter = {_id:item._id}
                 delete item._id
-                operations.push({updateOne: {filter:{_id:item._id}}, update:{$set: item}, upsert:true })
+                operations.push({ updateOne: { filter, update:{$set: item}, upsert:true } })
             }
             else operations.push({insertOne: {document: item} })
         }
@@ -113,10 +114,15 @@ const mongo = {
     connectToMongo,
     connect: connectToMongo, //alias
     currentAttemptNr: 0,
-    config: {},
+    config: Object.assign({}, defaultConfig),
     defaultConfig,
     setConfig: config => {
         if (config) {
+            if (config.log) {
+                if (config.log && config.log.error) log.error = config.log.error
+                if (config.log && config.log.debug) log.debug = config.log.debug
+                delete config.log
+            }
             if (config.connectRetryDelay && typeof config.connectRetryDelay !== "number") {
                 delete config.connectRetryDelay
                 log.debug("WARN: config.connectRetryDelay should be a number. Ignoring.")
@@ -124,11 +130,6 @@ const mongo = {
             if (config.maxConnectAttempts && typeof config.maxConnectAttempts !== "number") {
                 delete config.maxConnectAttempts
                 log.debug("WARN: config.maxConnectAttempts should be a number. Ignoring.")
-            }
-            if (config.log) {
-                if (config.log.error) log.error = config.log.error
-                if (config.log && config.log.debug) log.debug = config.log.debug
-                delete config.log
             }
             if(config.mongoClientOptions){
                 mongo.config.mongoClientOptions = Object.assign({}, defaultConfig.mongoClientOptions, mongo.config.mongoClientOptions, config.mongoClientOptions)
@@ -139,10 +140,14 @@ const mongo = {
         }
         else mongo.config = Object.assign({}, defaultConfig, mongo.config)
     },
-    reconnect: () => {
+    onDisconnect: () => {
+        log.debug("Lost connection to Database..")
         if(mongo.config.reconnect){
-            log.debug("Lost connection to Database, trying to reconnect.")
-            if(mongo.client()) mongo.client().removeListener("disconnected", mongo.reconnect)
+            try{
+                mongo.close(true)
+            }catch (err){}
+            _client = null
+            log.debug("Trying to reconnect..")
             mongo.connectToMongo()
         }
     },
@@ -153,10 +158,14 @@ const mongo = {
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString: () => {
-        if (!mongo.config.connectionString) mongo.config.connectionString = (mongo.config.protocol || defaultConfig.protocol) + "://" + (mongo.config.host || defaultConfig.host) + ":" + (mongo.config.port || defaultConfig.port) + "/" + (mongo.config.database || defaultConfig.database)
+        if (!mongo.config.connectionString) mongo.config.connectionString = (mongo.config.protocol) + "://" + (mongo.config.host) + ":" + (mongo.config.port) + "/" + (mongo.config.database)
         return mongo.config.connectionString
     },
-    resetConfig: () => { mongo.config = Object.assign({}, defaultConfig) },
+    resetConfig: () => {
+        mongo.currentAttemptNr = 0
+        _client = null
+        mongo.config = Object.assign({}, defaultConfig)
+    },
     saveData,
     /** Handy shortcust to clear data in one collection */
     clearData: (collection, callback) => {

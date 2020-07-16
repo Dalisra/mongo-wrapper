@@ -1,5 +1,7 @@
 # mongo-wrapper
 Simple mongodb wrapper.
+100% test coverage.
+Works with Promises, callbacks and async / await.
 
 ## Install
 
@@ -79,7 +81,7 @@ mongo.connectoToMongo(options).then(() => {
 
 ### Utility
 ```javascript
-mongo.client() // <- MongoClient
+mongo.client() // <- MongoClient, if null it means not connected.
 mongo.db() // <- Mongo database pointer to default database
 mongo.db("foo") // <- Change database and get database pointer
 mongo.collection("bar") // <- Get collection pointer.
@@ -91,7 +93,7 @@ mongo.close() // <- Close db connection
 
 ### Data
 ```javascript
-mongo.saveData(collection, data, callback) // <- Shortcut to save (insert or update) data to database
+mongo.saveData(collection, data, callback) // <- Shortcut to save (insert or update) data to database (uses bulkWrite for arrays of data)
 mongo.clearData(collection, callback) // <- Clears all data in a collection
 ```
 
@@ -113,6 +115,8 @@ mongo.connect(async (err, client) => {
 ```
 
 ## Updates
+* 3.2.0
+    100% test coverage.
 * 3.1.2
     Better code coverage.
     Small bugfixes.
