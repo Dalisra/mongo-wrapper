@@ -120,12 +120,10 @@ const mongo = {
         if (config) {
             if (config.log) {
                 if (config.log && config.log.error) {
-                    log.error = config.log.error
-                    if(log.error && log.error.bind) log.error.bind(config.log)
+                    log.error = config.log.error.bind ? config.log.error.bind(config.log) : config.log.error
                 }
                 if (config.log && config.log.debug) {
-                    log.debug = config.log.debug
-                    if(log.debug && log.debug.bind) log.debug.bind(config.log)
+                    log.debug = config.log.debug.bind ? config.log.debug.bind(config.log) : config.log.debug
                 }
                 delete config.log
             }
