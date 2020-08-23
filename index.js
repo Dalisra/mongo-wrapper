@@ -119,8 +119,8 @@ const mongo = {
     setConfig: config => {
         if (config) {
             if (config.log) {
-                if (config.log && config.log.error) log.error = config.log.error
-                if (config.log && config.log.debug) log.debug = config.log.debug
+                if (config.log && config.log.error) log.error = config.log.error.bind(config.log)
+                if (config.log && config.log.debug) log.debug = config.log.debuga.bind(config.log)
                 delete config.log
             }
             if (config.connectRetryDelay && typeof config.connectRetryDelay !== "number") {
