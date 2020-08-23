@@ -115,6 +115,8 @@ mongo.connect(async (err, client) => {
 ```
 
 ## Updates
+* 3.2.2
+    Making tests green again. Fixing typo. Making sure we have 100% coverage.
 * 3.2.1
     Fixed bug with logger for libraries such as winston.
 * 3.2.0

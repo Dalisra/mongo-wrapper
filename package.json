@@ -23,13 +23,13 @@
     },
     "homepage": "https://github.com/Dalisra/mongo-wrapper#readme",
     "dependencies": {
-        "mongodb": "^3.5.9"
+        "mongodb": "^3.6.0"
     },
     "files": [
         "index.js"
     ],
     "devDependencies": {
-        "mocha": "^8.0.1",
+        "mocha": "^8.1.1",
         "nyc": "^15.1.0"
     }
 }

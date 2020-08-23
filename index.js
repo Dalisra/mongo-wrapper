@@ -38,7 +38,7 @@ let _client = null
  * callback will be called only once it has successfully connected to database.
  * If no callback a promise will be returned instead.
  * Possible config options check: const _defaultConfig
- * @param {defaultConfig|String} [defaultConfig] - config object or mongodb connection string
+ * @param {defaultConfig|String} [config] - config object or mongodb connection string
  * @param {mongoCallback} [callback]
  * @return {Promise} If no callback specified a promise is returned.
  */
@@ -119,8 +119,14 @@ const mongo = {
     setConfig: config => {
         if (config) {
             if (config.log) {
-                if (config.log && config.log.error) log.error = config.log.error.bind(config.log)
-                if (config.log && config.log.debug) log.debug = config.log.debuga.bind(config.log)
+                if (config.log && config.log.error) {
+                    log.error = config.log.error
+                    if(log.error && log.error.bind) log.error.bind(config.log)
+                }
+                if (config.log && config.log.debug) {
+                    log.debug = config.log.debug
+                    if(log.debug && log.debug.bind) log.debug.bind(config.log)
+                }
                 delete config.log
             }
             if (config.connectRetryDelay && typeof config.connectRetryDelay !== "number") {
