@@ -115,6 +115,8 @@ mongo.connect(async (err, client) => {
 ```
 
 ## Updates
+* 3.2.1
+    Fixed bug with logger for libraries such as winston.
 * 3.2.0
     100% test coverage.
 * 3.1.2
