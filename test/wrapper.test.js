@@ -109,6 +109,20 @@ describe("Tests before connecting to database", function () {
         }
     })
 
+    it("Test closing connection when there is no connection", (done) => {
+        // first try async way with promises
+        (async () => {
+            await mongo.close()
+            assert.ok(true) // should not crash.
+        })().then(() => {
+            // now try again with callback.
+            mongo.close(true, function(err, result){
+                assert.equal(err, null)
+                assert.equal(result, null)
+                done()
+            })
+        })
+    })
 })
 
 describe("Positive Wrapper Tests", function () {
@@ -166,11 +180,11 @@ describe("Positive Wrapper Tests", function () {
     it("Try to disconnect", (done) => {
         let logLine = 0
         mongo.setConfig({log:{debug: (log) => {
-            if(logLine == 0) {
-                assert.equal(log, "Lost connection to Database..")
+            if(logLine === 0) {
+                assert.strictEqual(log, "Lost connection to Database..")
                 logLine++
-            }else if(logLine == 1){
-                assert.equal(log, "Trying to reconnect..")
+            }else if(logLine === 1){
+                assert.strictEqual(log, "Trying to reconnect..")
                 logLine++
             }else{
                 console.log(log)
@@ -182,7 +196,7 @@ describe("Positive Wrapper Tests", function () {
 
         mongo.client().emit("disconnected", Error("Fake disconnect"))
 
-        assert.equal(mongo.client(), null)
+        assert.strictEqual(mongo.client(), null)
         setTimeout(() => {
             assert.ok(mongo.client())
             done()
@@ -192,7 +206,7 @@ describe("Positive Wrapper Tests", function () {
     after(done => {
         assert.ok(mongo.client())
         mongo.close().then(() => {
-            assert.equal(mongo.client(), null)
+            assert.strictEqual(mongo.client(), null)
             done()
         })
     })
@@ -214,9 +228,11 @@ describe("second connect", function () {
     it("update all existing items and add one more", async () => {
 
         let data = await mongo.collection("test").find({a: 3}).toArray()
-        assert.equal(data.length, 2)
+        assert.strictEqual(data.length, 2)
         for (let i in data) {
-            data[i].test = true
+            if(data.hasOwnProperty(i)){
+                data[i].test = true
+            }
         }
         data.push({a: 3, b: 100, test: false})
         await mongo.saveData("test", data)
@@ -241,7 +257,7 @@ describe("second connect", function () {
     })
 
     it("Disconnect from mongo without reconnect", (done) => {
-        mongo.setConfig({ reconnect:false, log:{debug: (log) => assert.equal(log, "Lost connection to Database..")} })
+        mongo.setConfig({ reconnect:false, log:{debug: (log) => assert.strictEqual(log, "Lost connection to Database..")} })
         mongo.client().emit("disconnected", Error("Fake disconnect"))
         assert.ok(mongo.client() !== null)
         setTimeout(() => {

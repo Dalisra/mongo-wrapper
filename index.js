@@ -92,13 +92,15 @@ const saveData = (collection, data, callback) => {
     if (Array.isArray(data) && data.length > 1) {
         let operations = []
         for (let i in data) {
-            let item = data[i]
-            if (item._id) {
-                let filter = {_id:item._id}
-                delete item._id
-                operations.push({ updateOne: { filter, update:{$set: item}, upsert:true } })
+            if(data.hasOwnProperty(i)) {
+                let item = data[i]
+
+                if (item._id) {
+                    let filter = {_id: item._id}
+                    delete item._id
+                    operations.push({updateOne: {filter, update: {$set: item}, upsert: true}})
+                } else operations.push({insertOne: {document: item}})
             }
-            else operations.push({insertOne: {document: item} })
         }
         return mongo.collection(collection).bulkWrite(operations, {ordered:false}, callback)
     }
@@ -158,7 +160,13 @@ const mongo = {
     client: () => _client,
     db: database => mongo.client() ? mongo.client().db(database) : null,
     collection: collection => mongo.db() ? mongo.db().collection(collection) : null,
-    close: (force, callback) => mongo.client().close(force, callback),
+    close: (force, callback) => {
+        if(!mongo.client()){ // already disconnected
+            if(callback) return callback()
+            else return Promise.resolve()
+        }
+        return mongo.client().close(force, callback)
+    },
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString: () => {

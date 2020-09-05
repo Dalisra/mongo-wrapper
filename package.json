@@ -4,7 +4,7 @@
     "description": "Simple mongodb wrapper",
     "main": "index.js",
     "scripts": {
-        "test": "mocha --exit",
+        "test": "mocha --bail",
         "coverage": "nyc --reporter=html mocha --exit",
         "cover": "nyc --reporter=html mocha --exit"
     },
@@ -23,13 +23,13 @@
     },
     "homepage": "https://github.com/Dalisra/mongo-wrapper#readme",
     "dependencies": {
-        "mongodb": "^3.6.0"
+        "mongodb": "^3.6.1"
     },
     "files": [
         "index.js"
     ],
     "devDependencies": {
-        "mocha": "^8.1.1",
+        "mocha": "^8.1.3",
         "nyc": "^15.1.0"
     }
 }

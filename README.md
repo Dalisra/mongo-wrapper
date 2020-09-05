@@ -115,6 +115,10 @@ mongo.connect(async (err, client) => {
 ```
 
 ## Updates
+* 3.2.4
+    Bug fixing close() method that failed when calling without connection. Added more tests.
+* 3.2.3
+    bl version update (merged from security bot): Bump bl from 2.2.0 to 2.2.1
 * 3.2.2
     Making tests green again. Fixing typo. Making sure we have 100% coverage.
 * 3.2.1
