@@ -53,6 +53,7 @@ describe("Tests before connecting to database", function () {
         })
 
         assert.equal(mongo.config.maxConnectAttempts, 0)
+        assert.equal(mongo.currentAttemptNr, 0)
         assert.equal(mongo.config.connectRetryDelay, 5000)
     })
 
@@ -64,7 +65,6 @@ describe("Tests before connecting to database", function () {
             mongoClientOptions: {
                 connectTimeoutMS: 100,
                 serverSelectionTimeoutMS: 500,
-                reconnectTries: 0,
             },
             log: {debug: () => {}, error: () => {}} // To prevent logs when testing.
         }, (err) => {
@@ -91,7 +91,6 @@ describe("Tests before connecting to database", function () {
                 mongoClientOptions: {
                     connectTimeoutMS: 100,
                     serverSelectionTimeoutMS: 500,
-                    reconnectTries: 0,
                 },
                 log: {error: () => {}} // To prevent logs when testing.
             })
@@ -103,9 +102,9 @@ describe("Tests before connecting to database", function () {
                 assert.ok(mongo.collection() === null)
                 assert.ok(mongo.collection("test") === null)
 
-                assert.ok(err !== null)
-                assert.ok(err.message !== null)
-                assert.ok(err.message === "Maximum connection attempts reached, giving up.")
+            assert.ok(err !== null)
+            assert.ok(err.message !== null)
+            assert.ok(err.message === "Maximum connection attempts reached, giving up.")
         }
     })
 
@@ -267,6 +266,6 @@ describe("second connect", function () {
     })
 
     after(done => {
-        mongo.close(done)
+        mongo.close(true, done)
     })
 })

@@ -115,6 +115,8 @@ mongo.connect(async (err, client) => {
 ```
 
 ## Updates
+* 4.0.0
+    Updated nodejs driver for mongodb to 4.0.0, supports mongodb 5.0
 * 3.2.4
     Bug fixing close() method that failed when calling without connection. Added more tests.
 * 3.2.3

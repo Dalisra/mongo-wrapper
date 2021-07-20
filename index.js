@@ -33,14 +33,13 @@ let _client = null
  * @param {Error} error - if no error this one will be null.
  * @param {Client} MongoClient - on success returns mongoClient, can be ignored.
  */
-
 /** Method that tries to connect to mongo, and retries if it fails.
  * callback will be called only once it has successfully connected to database.
  * If no callback a promise will be returned instead.
  * Possible config options check: const _defaultConfig
  * @param {defaultConfig|String} [config] - config object or mongodb connection string
- * @param {mongoCallback} [callback]
- * @return {Promise} If no callback specified a promise is returned.
+ * @param {Function} [callback]
+ * @return {Promise|null} If no callback specified a promise is returned.
  */
 const connectToMongo = async (config, callback) => {
     if (typeof config === "function" && !callback) {
@@ -84,7 +83,7 @@ const connectToMongo = async (config, callback) => {
  * Handy shortcut to insert or update data (unordered) for one or many object(s).
  * @param collection {String} name of the collection to instert to.
  * @param data {JSON|array} single Json object or array of Json objects.
- * @param {Collection~bulkWriteOpCallback} [callback] The command result callback
+ * @param {Function|Callback<BulkWriteResult>|Callback<InsertOneResult<TSchema>>} [callback] The command result callback
  * @return {Promise} - If no callback, promise is returned.
  */
 const saveData = (collection, data, callback) => {
@@ -157,8 +156,22 @@ const mongo = {
             mongo.connectToMongo()
         }
     },
+    /**
+     *
+     * @returns {MongoClient}
+     */
     client: () => _client,
+    /**
+     *
+     * @param database
+     * @returns {Db|null}
+     */
     db: database => mongo.client() ? mongo.client().db(database) : null,
+    /**
+     *
+     * @param collection
+     * @returns {Collection<Document>|null}
+     */
     collection: collection => mongo.db() ? mongo.db().collection(collection) : null,
     close: (force, callback) => {
         if(!mongo.client()){ // already disconnected
@@ -167,6 +180,9 @@ const mongo = {
         }
         return mongo.client().close(force, callback)
     },
+    /**
+     * @returns {mongodb} mongodb reference (original)
+     */
     mongodb: mongodb,
     ObjectID: mongodb.ObjectID,
     getConnectionString: () => {
